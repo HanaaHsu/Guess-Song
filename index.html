@@ -1,27 +1,487 @@
-<!doctype html>
-<html lang="zh-Hant"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>🎵 聽前奏猜歌｜測試版</title>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>🎵 聽前奏猜歌</title>
+
 <style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:20px;background:linear-gradient(135deg,#fff7ed,#fdf2f8);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#333;display:flex;justify-content:center;align-items:center}.wrap{width:min(680px,100%);text-align:center}h1{font-size:clamp(30px,7vw,48px);margin:0 0 8px}.sub{color:#777;margin:0 0 24px}.card{background:#fff;border-radius:28px;padding:28px 22px;box-shadow:0 12px 35px rgba(0,0,0,.1)}.number{font-weight:700;color:#888;margin-bottom:10px}#playerBox{width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#111;margin:12px 0 20px}#player{width:100%;height:100%}button{border:0;border-radius:16px;padding:14px 22px;margin:6px;font-size:17px;font-weight:700;cursor:pointer}.play{background:#222;color:#fff}.answer{background:#f3f4f6}.next{background:#f59e0b;color:#fff}button:disabled{opacity:.45;cursor:not-allowed}#answer{display:none;margin:18px 0 8px;padding:16px;border-radius:16px;background:#fff7ed;font-size:21px;font-weight:800}.note{font-size:13px;color:#888;margin-top:18px;line-height:1.6}
-</style></head><body>
-<div class="wrap"><h1>🎵 聽前奏猜歌</h1><p class="sub">3 首測試版｜先確認播放功能好不好玩</p>
-<div class="card"><div class="number" id="number">第 1 題</div><div id="playerBox"><div id="player"></div></div>
-<button class="play" id="playBtn" onclick="playIntro()">▶️ 播放前奏</button>
-<button class="answer" id="answerBtn" onclick="showAnswer()">👀 公布答案</button><div id="answer"></div>
-<button class="next" onclick="nextQuestion()">➡️ 下一題</button>
-<div class="note">測試版每題播放開頭約 8 秒。正式版可再調整秒數、題數與題庫。</div></div></div>
-<script src="https://www.youtube.com/iframe_api"></script><script>
-const songs=[
-{id:"DYptgVvkVLQ",title:"晴天",artist:"周杰倫"},
-{id:"1GA8z-Wliew",title:"日不落",artist:"蔡依林"},
-{id:"_GrTlZOGVic",title:"江南",artist:"林俊傑"}];
-let order=[0,1,2],current=0,player,stopTimer;
-function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}}
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #fff7ed, #fdf2f8);
+  font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC",
+               "Microsoft JhengHei", sans-serif;
+  color: #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.wrap {
+  width: min(680px, 100%);
+  text-align: center;
+}
+
+h1 {
+  font-size: clamp(30px, 7vw, 48px);
+  margin: 0 0 8px;
+}
+
+.sub {
+  color: #777;
+  margin: 0 0 24px;
+}
+
+.card {
+  background: white;
+  border-radius: 28px;
+  padding: 28px 22px;
+  box-shadow: 0 12px 35px rgba(0,0,0,.10);
+}
+
+.number {
+  font-weight: 700;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+/* YouTube 播放區 */
+.player-area {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #111;
+  margin: 12px 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* YouTube 本身放在最底層 */
+#player {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 黑色遮罩 */
+.cover {
+  position: absolute;
+  inset: 0;
+  background: #111;
+  z-index: 2;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: white;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.status {
+  font-size: 16px;
+  color: #777;
+  min-height: 24px;
+  margin: 4px 0 10px;
+}
+
+button {
+  border: 0;
+  border-radius: 16px;
+  padding: 14px 22px;
+  margin: 6px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.play {
+  background: #222;
+  color: white;
+}
+
+.answer {
+  background: #f3f4f6;
+  color: #333;
+}
+
+.next {
+  background: #f59e0b;
+  color: white;
+}
+
+button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+#answer {
+  display: none;
+  margin: 18px 0 8px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #fff7ed;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.note {
+  font-size: 13px;
+  color: #888;
+  margin-top: 18px;
+  line-height: 1.6;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <h1>🎵 聽前奏猜歌</h1>
+
+  <p class="sub">
+    3 首測試版｜測試「看不到 MV、只聽前奏」
+  </p>
+
+  <div class="card">
+
+    <div class="number" id="number">
+      第 1 題
+    </div>
+
+    <!-- 播放區 -->
+    <div class="player-area">
+
+      <!-- YouTube 播放器 -->
+      <div id="player"></div>
+
+      <!-- 黑色遮罩 -->
+      <div class="cover" id="cover">
+        🎧 準備好了嗎？
+      </div>
+
+    </div>
+
+    <div class="status" id="status">
+      按下播放後開始聽前奏
+    </div>
+
+    <button
+      class="play"
+      id="playBtn"
+      onclick="playIntro()">
+      ▶️ 播放前奏
+    </button>
+
+    <button
+      class="answer"
+      id="answerBtn"
+      onclick="showAnswer()">
+      👀 公布答案
+    </button>
+
+    <div id="answer"></div>
+
+    <button
+      class="next"
+      onclick="nextQuestion()">
+      ➡️ 下一題
+    </button>
+
+    <div class="note">
+      測試版每題約播放開頭 8 秒。<br>
+      MV 畫面會被黑色畫面遮住，玩家只會聽到聲音。
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- YouTube API -->
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<script>
+
+const songs = [
+
+  {
+    id: "DYptgVvkVLQ",
+    title: "晴天",
+    artist: "周杰倫"
+  },
+
+  {
+    id: "1GA8z-Wliew",
+    title: "日不落",
+    artist: "蔡依林"
+  },
+
+  {
+    id: "_GrTlZOGVic",
+    title: "江南",
+    artist: "林俊傑"
+  }
+
+];
+
+
+let order = [0, 1, 2];
+
+let current = 0;
+
+let player;
+
+let stopTimer;
+
+
+/* 隨機排序 */
+function shuffle(array) {
+
+  for (
+    let i = array.length - 1;
+    i > 0;
+    i--
+  ) {
+
+    const j =
+      Math.floor(Math.random() * (i + 1));
+
+    [
+      array[i],
+      array[j]
+    ] = [
+      array[j],
+      array[i]
+    ];
+
+  }
+
+}
+
+
+/* 一開始就把題目順序打亂 */
 shuffle(order);
-function onYouTubeIframeAPIReady(){player=new YT.Player("player",{videoId:songs[order[current]].id,playerVars:{playsinline:1,controls:1,rel:0},events:{onReady:function(){}}})}
-function loadCurrent(){let s=songs[order[current]];document.getElementById("number").textContent="第 "+(current+1)+" 題";document.getElementById("answer").style.display="none";document.getElementById("answer").textContent="";document.getElementById("answerBtn").disabled=false;document.getElementById("playBtn").disabled=false;if(player&&player.loadVideoById)player.loadVideoById(s.id)}
-function playIntro(){if(!player)return;clearTimeout(stopTimer);player.seekTo(0,true);player.playVideo();document.getElementById("playBtn").disabled=true;stopTimer=setTimeout(function(){player.pauseVideo()},8000)}
-function showAnswer(){let s=songs[order[current]];document.getElementById("answer").textContent="🎵 "+s.artist+"〈"+s.title+"〉";document.getElementById("answer").style.display="block";document.getElementById("answerBtn").disabled=true}
-function nextQuestion(){current++;if(current>=order.length){alert("3 題測試完成！按確定後重新開始。");current=0;shuffle(order)}loadCurrent()}
-</script></body></html>
+
+
+/* YouTube 播放器建立完成 */
+function onYouTubeIframeAPIReady() {
+
+  player = new YT.Player(
+    "player",
+    {
+
+      videoId:
+        songs[order[current]].id,
+
+      playerVars: {
+
+        playsinline: 1,
+
+        controls: 0,
+
+        rel: 0
+
+      },
+
+      events: {
+
+        onReady: function() {}
+
+      }
+
+    }
+  );
+
+}
+
+
+/* 播放前奏 */
+function playIntro() {
+
+  if (!player) {
+    return;
+  }
+
+  clearTimeout(stopTimer);
+
+
+  const cover =
+    document.getElementById("cover");
+
+  const status =
+    document.getElementById("status");
+
+  const playBtn =
+    document.getElementById("playBtn");
+
+
+  cover.textContent =
+    "🎵 播放中……";
+
+  status.textContent =
+    "請大家搶答！";
+
+
+  /* 從影片最開始播放 */
+  player.seekTo(0, true);
+
+  player.playVideo();
+
+
+  playBtn.disabled = true;
+
+
+  /* 8 秒後停止 */
+  stopTimer = setTimeout(
+    function() {
+
+      player.pauseVideo();
+
+      cover.textContent =
+        "⏹️ 前奏結束";
+
+      status.textContent =
+        "前奏結束，可以公布答案了！";
+
+    },
+    8000
+  );
+
+}
+
+
+/* 公布答案 */
+function showAnswer() {
+
+  const song =
+    songs[order[current]];
+
+  const answer =
+    document.getElementById("answer");
+
+  answer.textContent =
+    "🎵 " +
+    song.artist +
+    "〈" +
+    song.title +
+    "〉";
+
+  answer.style.display =
+    "block";
+
+  document.getElementById(
+    "answerBtn"
+  ).disabled = true;
+
+}
+
+
+/* 換下一題 */
+function nextQuestion() {
+
+  current++;
+
+
+  /* 三題全部玩完 */
+  if (current >= order.length) {
+
+    alert(
+      "3 題測試完成！按確定後重新開始。"
+    );
+
+    current = 0;
+
+    shuffle(order);
+
+  }
+
+
+  loadCurrent();
+
+}
+
+
+/* 載入下一首 */
+function loadCurrent() {
+
+  const song =
+    songs[order[current]];
+
+  clearTimeout(stopTimer);
+
+
+  document.getElementById(
+    "number"
+  ).textContent =
+    "第 " + (current + 1) + " 題";
+
+
+  document.getElementById(
+    "cover"
+  ).textContent =
+    "🎧 準備好了嗎？";
+
+
+  document.getElementById(
+    "status"
+  ).textContent =
+    "按下播放後開始聽前奏";
+
+
+  document.getElementById(
+    "answer"
+  ).style.display =
+    "none";
+
+
+  document.getElementById(
+    "answer"
+  ).textContent =
+    "";
+
+
+  document.getElementById(
+    "answerBtn"
+  ).disabled =
+    false;
+
+
+  document.getElementById(
+    "playBtn"
+  ).disabled =
+    false;
+
+
+  if (
+    player &&
+    player.loadVideoById
+  ) {
+
+    player.loadVideoById(
+      song.id
+    );
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
